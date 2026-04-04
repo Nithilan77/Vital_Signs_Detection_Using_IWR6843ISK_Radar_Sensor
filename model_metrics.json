@@ -1,0 +1,7 @@
+{
+  "model_type": "XGBoost Regressor (Position-Aware)",
+  "MAE": 5.2418748837856715,
+  "R2": 0.08938953688323725,
+  "Baseline_MAE_Raw_Sensor": 16.109602444444445,
+  "Improvement_Percentage": 67.46117787907681
+}

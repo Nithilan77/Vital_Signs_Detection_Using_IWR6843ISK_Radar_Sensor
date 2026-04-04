@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UWB SENSOR — Live Vital Signs Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #050a15;
+            --bg-card: #0c1425;
+            --bg-card-hover: #111d35;
+            --border: #1a2744;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-cyan: #22d3ee;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-orange: #f97316;
+            --accent-purple: #a78bfa;
+            --glow-blue: rgba(56, 189, 248, 0.15);
+            --glow-green: rgba(34, 197, 94, 0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ─── HEADER ─── */
+        .header {
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.03) 0%, transparent 100%);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .status-dot.live {
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        /* ─── MAIN LAYOUT ─── */
+        .main {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: calc(100vh - 70px);
+        }
+
+        /* ─── SIDEBAR ─── */
+        .sidebar {
+            padding: 24px 20px;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        select,
+        input[type="number"] {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus,
+        input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-start {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-start.ready {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            color: #050a15;
+            box-shadow: 0 4px 20px var(--glow-blue);
+        }
+
+        .btn-start.ready:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px var(--glow-blue);
+        }
+
+        .btn-start.running {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            color: white;
+        }
+
+        .btn-start:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* ─── CONTENT ─── */
+        .content {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* ─── METRIC CARDS ─── */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            transition: all 0.3s;
+        }
+
+        .metric-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-blue);
+        }
+
+        .metric-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .metric-unit {
+            font-size: 0.8rem;
+            font-weight: 400;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        /* ─── CHARTS ─── */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            flex: 1;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            position: relative;
+        }
+
+        .chart-card h4 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .chart-card canvas {
+            width: 100% !important;
+            height: 180px !important;
+        }
+
+        /* ─── PROGRESS BAR ─── */
+        .progress-bar {
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+            border-radius: 2px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        /* ─── RESULTS OVERLAY ─── */
+        .results-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 10, 21, 0.9);
+            backdrop-filter: blur(12px);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .results-overlay.active {
+            display: flex;
+        }
+
+        .results-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            text-align: center;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(40px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .results-panel h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .result-item {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .result-item .label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .result-item .value {
+            font-size: 1.8rem;
+            font-weight: 800;
+        }
+
+        .btn-close-results {
+            padding: 12px 40px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-close-results:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-blue);
+        }
+
+        /* ─── TIMER ─── */
+        .timer {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="logo">UWB SENSOR</div>
+        <div class="status-badge">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
+    </div>
+
+    <!-- MAIN -->
+    <div class="main">
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <h3>Sensor Configuration</h3>
+
+            <div id="parameterDropdowns" style="display: none;">
+                <div class="form-group">
+                    <label>Body Position</label>
+                    <select id="posture">
+                        <option value="Lying_Supine">Lying Supine</option>
+                        <option value="Lying_Side">Lying Side</option>
+                        <option value="Lying_Prone">Lying Prone</option>
+                        <option value="Sitting">Sitting</option>
+                        <option value="Standing">Standing</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Sensor Placement</label>
+                    <select id="sensorPosition">
+                        <option value="Chest">Chest</option>
+                        <option value="Torso_Center">Torso Center</option>
+                        <option value="Abdomen">Abdomen</option>
+                        <option value="Thigh">Thigh</option>
+                        <option value="Calf">Calf</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Orientation (°)</label>
+                    <select id="orientation">
+                        <option value="0">0° (Direct)</option>
+                        <option value="30">30°</option>
+                        <option value="45">45°</option>
+                        <option value="60">60°</option>
+                        <option value="90">90° (Perpendicular)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Duration (sec)</label>
+                <input type="number" id="duration" value="30" min="5" max="120">
+            </div>
+
+            <div class="form-group" style="margin-top:8px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="demoMode" checked style="width:16px;height:16px;"
+                        onchange="toggleUploadUI()">
+                    Demo Mode (no sensor)
+                </label>
+            </div>
+
+            <div class="form-group" id="uploadGroup"
+                style="margin-top:8px; padding: 12px; background: rgba(56,189,248,0.05); border: 1px dashed var(--accent-blue); border-radius: 8px;">
+                <label style="font-size: 0.75rem; color: var(--accent-blue); margin-bottom: 4px;">Upload Data
+                    (CSV)</label>
+                <input type="file" id="csvFile" accept=".csv"
+                    style="font-size: 0.75rem; color: var(--text-secondary); padding: 4px; border: none; background: transparent;">
+            </div>
+
+            <button class="btn-start ready" id="btnStart" onclick="toggleSensor()">
+                ▶ Start Demo
+            </button>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="timer" id="timer">Ready</div>
+        </div>
+
+        <!-- CONTENT -->
+        <div class="content">
+            <!-- METRIC CARDS -->
+            <div class="metrics-row">
+                <div class="metric-card">
+                    <div class="metric-label">Heart Rate</div>
+                    <div class="metric-value" style="color:var(--accent-red);" id="liveHR">--<span
+                            class="metric-unit">BPM</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Respiration Rate</div>
+                    <div class="metric-value" style="color:var(--accent-cyan);" id="liveRR">--<span
+                            class="metric-unit">BPM</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Range</div>
+                    <div class="metric-value" style="color:var(--accent-purple);" id="liveRange">--<span
+                            class="metric-unit">m</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Frames</div>
+                    <div class="metric-value" style="color:var(--accent-green);" id="liveFrames">0</div>
+                </div>
+            </div>
+
+            <!-- CHARTS -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h4>Heart Waveform</h4>
+                    <canvas id="heartChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Breath Waveform</h4>
+                    <canvas id="breathChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Heart Rate Trend</h4>
+                    <canvas id="hrTrendChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>Respiration Rate Trend</h4>
+                    <canvas id="rrTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RESULTS OVERLAY -->
+    <div class="results-overlay" id="resultsOverlay">
+        <div class="results-panel">
+            <h2>Session Complete</h2>
+            <div class="results-grid" id="resultsGrid"></div>
+            <button class="btn-close-results" onclick="closeResults()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        // ─── SOCKET.IO ───
+        const socket = io("http://localhost:5050");
+        let isRunning = false;
+        let frameCount = 0;
+        let startTime = null;
+        let duration = 30;
+        const MAX_POINTS = 200;
+
+        // ─── CHART DATA ───
+        const heartData = [];
+        const breathData = [];
+        const hrTrend = [];
+        const rrTrend = [];
+
+        // ─── CHART CONFIG ───
+        const chartOpts = (color, label) => ({
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label,
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: color.replace(')', ', 0.1)').replace('rgb', 'rgba'),
+                    borderWidth: 1.5,
+                    fill: true,
+                    pointRadius: 0,
+                    tension: 0.4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 0 },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#64748b', font: { size: 10 } }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        const heartChart = new Chart(document.getElementById('heartChart'), chartOpts('rgb(239, 68, 68)', 'Heart'));
+        const breathChart = new Chart(document.getElementById('breathChart'), chartOpts('rgb(34, 211, 238)', 'Breath'));
+        const hrTrendChart = new Chart(document.getElementById('hrTrendChart'), chartOpts('rgb(249, 115, 22)', 'HR'));
+        const rrTrendChart = new Chart(document.getElementById('rrTrendChart'), chartOpts('rgb(34, 197, 94)', 'RR'));
+
+        function pushChart(chart, label, value) {
+            const d = chart.data;
+            d.labels.push(label);
+            d.datasets[0].data.push(value);
+            if (d.labels.length > MAX_POINTS) {
+                d.labels.shift();
+                d.datasets[0].data.shift();
+            }
+            chart.update();
+        }
+
+        let currentUploadedFilepath = null;
+        let currentDatasetName = null;
+
+        const DATASET_MAPPINGS = {
+            "01.csv": { posture: "Lying_Supine", orientation: "30", sensorPosition: "Chest" },
+            "02.csv": { posture: "Sitting", orientation: "0", sensorPosition: "Torso_Center" },
+            "03.csv": { posture: "Lying_Side", orientation: "90", sensorPosition: "Abdomen" },
+            "04.csv": { posture: "Lying_Prone", orientation: "45", sensorPosition: "Thigh" },
+            "05.csv": { posture: "Standing", orientation: "60", sensorPosition: "Calf" }
+        };
+
+        function toggleUploadUI() {
+            const isDemo = document.getElementById('demoMode').checked;
+            document.getElementById('uploadGroup').style.display = isDemo ? 'flex' : 'none';
+            if (!isDemo) {
+                document.getElementById('posture').disabled = false;
+                document.getElementById('orientation').disabled = false;
+                document.getElementById('sensorPosition').disabled = false;
+                currentUploadedFilepath = null;
+                currentDatasetName = null;
+                document.getElementById('csvFile').value = '';
+            }
+        }
+
+        document.getElementById('csvFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                currentUploadedFilepath = null;
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                document.getElementById('statusText').textContent = 'Uploading...';
+                const response = await fetch('http://localhost:5050/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUploadedFilepath = data.filepath;
+                    currentDatasetName = data.filename;
+
+                    if (DATASET_MAPPINGS[data.filename]) {
+                        const map = DATASET_MAPPINGS[data.filename];
+                        document.getElementById('posture').value = map.posture;
+                        document.getElementById('orientation').value = map.orientation;
+                        document.getElementById('sensorPosition').value = map.sensorPosition;
+
+                        document.getElementById('posture').disabled = true;
+                        document.getElementById('orientation').disabled = true;
+                        document.getElementById('sensorPosition').disabled = true;
+                        document.getElementById('statusText').textContent = `Auto-Configured: ${data.filename}`;
+                    } else {
+                        document.getElementById('posture').disabled = false;
+                        document.getElementById('orientation').disabled = false;
+                        document.getElementById('sensorPosition').disabled = false;
+                        document.getElementById('statusText').textContent = `Uploaded: ${data.filename}`;
+                    }
+                } else {
+                    alert(data.error);
+                }
+            } catch (err) {
+                alert("Upload failed. Make sure the server is running.");
+            }
+        });
+
+        // ─── SOCKET EVENTS ───
+        socket.on('connect', () => {
+            document.getElementById('statusDot').className = 'status-dot';
+            document.getElementById('statusText').textContent = 'Connected';
+        });
+
+        socket.on('disconnect', () => {
+            document.getElementById('statusDot').className = 'status-dot';
+            document.getElementById('statusText').textContent = 'Disconnected';
+        });
+
+        socket.on('status', (data) => {
+            document.getElementById('statusText').textContent = data.message;
+        });
+
+        socket.on('vital_frame', (data) => {
+            if (!startTime) startTime = Date.now();
+
+            frameCount++;
+            const ts = data.ts.toFixed(1);
+
+            // Update metrics
+            document.getElementById('liveHR').innerHTML = data.hr + '<span class="metric-unit">BPM</span>';
+            document.getElementById('liveRR').innerHTML = data.rr + '<span class="metric-unit">BPM</span>';
+            document.getElementById('liveRange').innerHTML = data.range_m + '<span class="metric-unit">m</span>';
+            document.getElementById('liveFrames').textContent = frameCount;
+
+            // Update charts
+            pushChart(heartChart, ts, data.heart_wave);
+            pushChart(breathChart, ts, data.breath_wave);
+            pushChart(hrTrendChart, ts, data.hr);
+            pushChart(rrTrendChart, ts, data.rr);
+
+            // Progress
+            const progress = Math.min((data.ts / duration) * 100, 100);
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('timer').textContent = `${data.ts.toFixed(1)}s / ${duration}s`;
+
+            // Status dot live
+            document.getElementById('statusDot').className = 'status-dot live';
+            document.getElementById('statusText').textContent = 'Streaming';
+        });
+
+        socket.on('session_complete', (data) => {
+            isRunning = false;
+            const btn = document.getElementById('btnStart');
+            btn.textContent = '▶ Start Demo';
+            btn.className = 'btn-start ready';
+            document.getElementById('statusDot').className = 'status-dot';
+            document.getElementById('statusText').textContent = 'Session Complete';
+            document.getElementById('progressFill').style.width = '100%';
+
+            // Show results
+            const grid = document.getElementById('resultsGrid');
+
+            let datasetStr = currentDatasetName
+                ? `<div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom: 16px;">Dataset: <strong style="color:var(--accent-blue);">${currentDatasetName}</strong> | Posture: <strong style="color:var(--text-primary);">${document.getElementById('posture').value}</strong> | Ori: <strong style="color:var(--text-primary);">${document.getElementById('orientation').value}°</strong> | Pos: <strong style="color:var(--text-primary);">${document.getElementById('sensorPosition').value}</strong></div>`
+                : `<div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom: 16px;">Live Capture or Real-time | Posture: <strong style="color:var(--text-primary);">${document.getElementById('posture').value}</strong> | Ori: <strong style="color:var(--text-primary);">${document.getElementById('orientation').value}°</strong> | Pos: <strong style="color:var(--text-primary);">${document.getElementById('sensorPosition').value}</strong></div>`;
+
+            let html = datasetStr + `
+            <div class="result-item">
+                <div class="label">Average Heart Rate</div>
+                <div class="value" style="color:var(--accent-red);">${data.avg_hr} <span class="metric-unit">BPM</span></div>
+            </div>
+            <div class="result-item">
+                <div class="label">Average Resp Rate</div>
+                <div class="value" style="color:var(--accent-cyan);">${data.avg_rr} <span class="metric-unit">BPM</span></div>
+            </div>
+            <div class="result-item">
+                <div class="label">Duration</div>
+                <div class="value" style="color:var(--accent-purple);">${data.duration}<span class="metric-unit">s</span></div>
+            </div>
+            <div class="result-item" style="grid-column: span 2;">
+                <div class="label">Total Frames</div>
+                <div class="value" style="color:var(--accent-green);">${data.total_frames}</div>
+            </div>`;
+
+            grid.innerHTML = html;
+            document.getElementById('resultsOverlay').classList.add('active');
+        });
+
+        socket.on('sensor_error', (data) => {
+            isRunning = false;
+            const btn = document.getElementById('btnStart');
+            btn.textContent = '▶ Start Demo';
+            btn.className = 'btn-start ready';
+            document.getElementById('statusText').textContent = 'Error: ' + data.message;
+        });
+
+        // ─── CONTROLS ───
+        function toggleSensor() {
+            if (isRunning) {
+                socket.emit('stop_sensor');
+                isRunning = false;
+                const btn = document.getElementById('btnStart');
+                btn.textContent = '▶ Start Demo';
+                btn.className = 'btn-start ready';
+                return;
+            }
+
+            // Reset
+            frameCount = 0;
+            startTime = null;
+            heartChart.data.labels = []; heartChart.data.datasets[0].data = []; heartChart.update();
+            breathChart.data.labels = []; breathChart.data.datasets[0].data = []; breathChart.update();
+            hrTrendChart.data.labels = []; hrTrendChart.data.datasets[0].data = []; hrTrendChart.update();
+            rrTrendChart.data.labels = []; rrTrendChart.data.datasets[0].data = []; rrTrendChart.update();
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('liveHR').innerHTML = '--<span class="metric-unit">BPM</span>';
+            document.getElementById('liveRR').innerHTML = '--<span class="metric-unit">BPM</span>';
+            document.getElementById('liveRange').innerHTML = '--<span class="metric-unit">m</span>';
+            document.getElementById('liveFrames').textContent = '0';
+
+            duration = parseInt(document.getElementById('duration').value) || 30;
+
+            socket.emit('start_sensor', {
+                posture: document.getElementById('posture').value,
+                sensorPosition: document.getElementById('sensorPosition').value,
+                orientation: parseInt(document.getElementById('orientation').value),
+                duration: duration,
+                demo: document.getElementById('demoMode').checked,
+                filepath: document.getElementById('demoMode').checked ? currentUploadedFilepath : null
+            });
+
+            isRunning = true;
+            const btn = document.getElementById('btnStart');
+            btn.textContent = '■ Stop Demo';
+            btn.className = 'btn-start running';
+        }
+
+        function closeResults() {
+            document.getElementById('resultsOverlay').classList.remove('active');
+        }
+    </script>
+</body>
+
+</html>
