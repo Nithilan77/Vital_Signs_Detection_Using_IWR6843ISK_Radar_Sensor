@@ -54,7 +54,7 @@ BodyPositionAnalysis/
 | Component | Specification |
 |---|---|
 | **Radar Sensor** | Texas Instruments IWR6843ISK (60–64 GHz FMCW) |
-| **Carrier Board** | IWR6843ISK-ODS or equivalent |
+| **Carrier Board** | IWR6843ISK-ODS |
 | **Control Port** | COM10 @ 115200 baud |
 | **Data Port** | COM9 @ 921600 baud |
 | **Firmware** | ES1.0 compatible SDK binary |
