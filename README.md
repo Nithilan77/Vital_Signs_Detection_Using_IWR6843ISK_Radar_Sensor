@@ -40,22 +40,9 @@ BodyPositionAnalysis/
 ├── train_position_aware_model.py    # Training script for HR regressor
 ├── train_detectability_classifier.py # Training script for detectability classifier
 │
-├── generate_synthetic_data.py  # Generates synthetic training datasets
-├── generate_graphs.py          # Offline analysis & graph generation
-├── position_analysis.py        # Per-position signal analysis
-├── extract_predict.py          # Raw radar extraction + ML prediction script
-├── extract_without_model.py    # Radar extraction without ML (baseline)
-├── eda_position_api.py         # EDA and position statistics API
-│
 ├── classifier_metrics.json     # Classifier performance metrics
 ├── model_metrics.json          # Regressor performance metrics
 ├── position_stats.json         # Per-position statistical summary
-├── performance.png             # Performance visualization
-│
-├── configuration.cfg           # Legacy radar config (reference)
-├── debug_radar.py              # Hardware diagnostic script
-├── dashboard_preview.html      # Static dashboard preview
-├── PositionStatistics.jsx      # React component for position statistics
 │
 └── .gitignore
 ```
@@ -198,26 +185,3 @@ Five datasets were recorded covering:
 - **Respiration** is always stronger and more stable than Heart Rate in all positions.
 
 ---
-
-## 📝 Academic Context
-
-This project was developed as part of the **Signal Processing and Machine Learning (SPML)** micro-project at **Sri Sivasubramaniya Nadar College of Engineering**, mapping to:
-
-- **Unit 2**: Discrete-Time Signal Processing (Butterworth Filter Design, FIR/IIR filters)
-- **Unit 3**: Spectral Analysis (FMCW Range-FFT, Power Spectral Density)
-- **Unit 4**: Machine Learning (Random Forest, XGBoost, Supervised Classification)
-- **Unit 5**: Real-Time Systems (Flask-SocketIO pipeline, embedded DSP integration)
-
----
-
-## 👨‍💻 Authors
-
-**Nithilan** — IWR6843ISK Radar Integration, Signal Processing Pipeline, ML Model Training, Real-Time Dashboard  
-*Department of Electronics and Communication Engineering*  
-*Sri Sivasubramaniya Nadar College of Engineering*
-
----
-
-## 📄 License
-
-This project is for academic purposes only.
