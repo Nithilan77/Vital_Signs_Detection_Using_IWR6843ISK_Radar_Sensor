@@ -20,6 +20,11 @@ The system combines:
 
 ---
 
+## Demo Video
+[Click to Watch the Demo]https://github.com/user-attachments/assets/9ab1ca0c-6268-46dd-a11e-61c4f1748aaa
+
+---
+
 ## 🗂️ Repository Structure
 
 ```
